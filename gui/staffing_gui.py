@@ -1,63 +1,75 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
-from models.pl_staffing import solve_pl_problem  # Le modèle PL sera défini dans un fichier séparé
+from tkinter import ttk, messagebox, scrolledtext
+import sys
+import os
 
-def launch_pl_app():
-    root = tk.Tk()
-    root.title("Problème de Programmation Linéaire – PL")
+# Allow import from models
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models')))
+from pl_staffing import solve_staffing  # Adjust this if your function name differs
 
-    # Frame de saisie des données
-    input_frame = tk.LabelFrame(root, text="Saisir les données", padx=10, pady=10)
-    input_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+def run_solver():
+    try:
+        output = solve_staffing()  # Update with actual arguments if needed
+        output_text.configure(state='normal')
+        output_text.delete(1.0, tk.END)
+        output_text.insert(tk.END, output)
+        output_text.configure(state='disabled')
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred:\n{e}")
 
-    # Variables de décision
-    tk.Label(input_frame, text="Variables de décision (séparées par des virgules) :").grid(row=0, column=0, sticky="w")
-    decision_vars_entry = tk.Entry(input_frame, width=40)
-    decision_vars_entry.grid(row=0, column=1)
+# Setup main window
+root = tk.Tk()
+root.title("Staffing Planner")
+root.geometry("700x500")
+root.configure(bg="#f0f4f8")
 
-    # Coefficients de la fonction objectif
-    tk.Label(input_frame, text="Coefficients de la fonction objectif (séparés par des virgules) :").grid(row=1, column=0, sticky="w")
-    objective_coeff_entry = tk.Entry(input_frame, width=40)
-    objective_coeff_entry.grid(row=1, column=1)
+style = ttk.Style()
+style.theme_use("clam")
 
-    # Contraintes
-    tk.Label(input_frame, text="Contraintes (format 'a1*x1 + a2*x2 <= b') :").grid(row=2, column=0, sticky="w")
-    constraints_entry = tk.Entry(input_frame, width=40)
-    constraints_entry.grid(row=2, column=1)
+# Configure style for widgets
+style.configure('TButton', font=("Helvetica", 12, 'bold'), background="#4CAF50", foreground="white", padding=10)
+style.configure('TLabel', font=("Helvetica", 14), background="#f0f4f8", foreground="#333")
+style.configure('TText', font=("Helvetica", 12), padding=10)
 
-    # Zone de texte pour afficher les résultats
-    result_text = tk.Text(root, height=15, width=60)
-    result_text.grid(row=1, column=0, padx=10, pady=10, columnspan=2)
+# Top title
+title = ttk.Label(root, text="👥 Staffing Planner", font=("Helvetica", 20, "bold"), anchor="center", background="#4CAF50", foreground="white")
+title.pack(pady=20, fill="x")
 
-    def solve():
-        try:
-            # Récupérer les données depuis les champs de saisie
-            decision_vars = decision_vars_entry.get().split(",")
-            objective_coeff = list(map(float, objective_coeff_entry.get().split(",")))
-            constraints_str = constraints_entry.get().split(",")
-            
-            # Conversion des contraintes en format exploitable
-            constraints = []
-            for c in constraints_str:
-                lhs, rhs = c.split("<=")
-                lhs_coeffs = list(map(float, lhs.split("*")))
-                rhs_value = float(rhs)
-                constraints.append((lhs_coeffs, rhs_value))
+# Frame for inputs (use tk.Frame instead of ttk.Frame for background color)
+input_frame = tk.Frame(root, bg="#f0f4f8", padx=20, pady=10)
+input_frame.pack(pady=10, fill="x")
 
-            # Résolution du problème PL
-            result, obj_value = solve_pl_problem(decision_vars, objective_coeff, constraints)
+# Input fields
+ttk.Label(input_frame, text="Team Members (comma-separated):").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+team_members_entry = ttk.Entry(input_frame, width=40)
+team_members_entry.grid(row=0, column=1, padx=10, pady=5)
 
-            result_text.delete(1.0, tk.END)  # Effacer les anciens résultats
-            if result:
-                for var, value in result.items():
-                    result_text.insert(tk.END, f"{var} → {value:.2f}\n")
-                result_text.insert(tk.END, f"\nValeur optimale de la fonction objectif : {obj_value:.2f}")
-            else:
-                result_text.insert(tk.END, "Aucune solution trouvée.")
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors du calcul : {e}")
+ttk.Label(input_frame, text="Tasks (comma-separated):").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+tasks_entry = ttk.Entry(input_frame, width=40)
+tasks_entry.grid(row=1, column=1, padx=10, pady=5)
 
-    # Bouton de lancement du calcul
-    ttk.Button(root, text="Lancer le calcul", command=solve).grid(row=2, column=0, pady=10)
+ttk.Label(input_frame, text="Availability (Python dict format):").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+availability_entry = ttk.Entry(input_frame, width=40)
+availability_entry.grid(row=2, column=1, padx=10, pady=5)
 
-    root.mainloop()
+# Frame for button (use tk.Frame instead of ttk.Frame for background color)
+button_frame = tk.Frame(root, bg="#f0f4f8", padx=10, pady=10)
+button_frame.pack(pady=20)
+
+solve_btn = ttk.Button(button_frame, text="Run Staffing", command=run_solver)
+solve_btn.grid(row=0, column=0, padx=15, pady=10)
+
+# Frame for output
+output_frame = ttk.LabelFrame(root, text="", padding=10)
+output_frame.pack(padx=10, pady=5, fill="both", expand=True)
+
+# Label inside the LabelFrame for the "Output" text
+output_label = ttk.Label(output_frame, text="Resultat", font=("Helvetica", 14, "bold"))
+output_label.pack(pady=5)
+
+# Output Text Area (Scrollable)
+output_text = scrolledtext.ScrolledText(output_frame, wrap="word", height=10, font=("Helvetica", 12), state='disabled')
+output_text.pack(fill="both", expand=True)
+
+# Run the app
+root.mainloop()

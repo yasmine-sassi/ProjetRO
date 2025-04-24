@@ -1,61 +1,83 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
-from models.plne_meeting import solve_meeting_scheduling
+from tkinter import ttk, messagebox, scrolledtext
+import sys
+import os
+import ast
 
-def launch_meeting_app():
-    root = tk.Tk()
-    root.title("Planification de Réunions – PLNE")
+# Path setup
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models')))
+from plne_meeting import solve_meeting_scheduling
 
-    # Frame de saisie des données
-    input_frame = tk.LabelFrame(root, text="Saisir les données", padx=10, pady=10)
-    input_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+def run_solver():
+    try:
+        participants = participants_entry.get().split(",")
+        meetings = meetings_entry.get().split(",")
+        timeslots = timeslots_entry.get().split(",")
+        availability_input = availability_entry.get("1.0", tk.END).strip()
+        availability = ast.literal_eval(availability_input)
 
-    # Participants
-    tk.Label(input_frame, text="Participants (séparés par des virgules) :").grid(row=0, column=0, sticky="w")
-    participants_entry = tk.Entry(input_frame, width=40)
-    participants_entry.grid(row=0, column=1)
+        result = solve_meeting_scheduling(participants, meetings, timeslots, availability)
 
-    # Réunions
-    tk.Label(input_frame, text="Réunions (séparées par des virgules) :").grid(row=1, column=0, sticky="w")
-    meetings_entry = tk.Entry(input_frame, width=40)
-    meetings_entry.grid(row=1, column=1)
+        result_text.config(state='normal')
+        result_text.delete("1.0", tk.END)
+        for meeting, slot in result.items():
+            result_text.insert(tk.END, f"📅 {meeting} → {slot}\n")
+        result_text.config(state='disabled')
+    except Exception as e:
+        messagebox.showerror("Erreur", f"Une erreur s'est produite :\n{e}")
 
-    # Créneaux horaires
-    tk.Label(input_frame, text="Créneaux horaires (séparés par des virgules) :").grid(row=2, column=0, sticky="w")
-    timeslots_entry = tk.Entry(input_frame, width=40)
-    timeslots_entry.grid(row=2, column=1)
+# === Window Setup ===
+root = tk.Tk()
+root.title("🗓️ Planification de Réunions")
+root.geometry("700x650")
+root.configure(bg="#f0f4f8")
 
-    # Disponibilités
-    tk.Label(input_frame, text="Disponibilités (JSON ou format clé-valeur) :").grid(row=3, column=0, sticky="w")
-    availability_entry = tk.Entry(input_frame, width=40)
-    availability_entry.grid(row=3, column=1)
+# Style Setup
+style = ttk.Style()
+style.theme_use("clam")
+style.configure('TButton', font=("Helvetica", 12, 'bold'), background="#4CAF50", foreground="white", padding=10)
+style.configure('TLabel', font=("Helvetica", 14), background="#f0f4f8", foreground="#333")
 
-    # Zone de texte pour afficher les résultats
-    result_text = tk.Text(root, height=15, width=60)
-    result_text.grid(row=1, column=0, padx=10, pady=10, columnspan=2)
+# Title Header
+title = ttk.Label(root, text="🗓️ Planification de Réunions", font=("Helvetica", 20, "bold"),
+                  anchor="center", background="#4CAF50", foreground="white")
+title.pack(pady=20, fill="x")
 
-    def solve():
-        try:
-            # Récupérer les données depuis les champs de saisie
-            meetings = {m.strip(): participants_entry.get().split(",") for m in meetings_entry.get().split(",")}
-            timeslots = timeslots_entry.get().split(",")
-            participants = participants_entry.get().split(",")
-            availability = eval(availability_entry.get())  # Utilisation d'eval pour interpréter la saisie JSON-like
+# === Input Frame ===
+input_frame = tk.Frame(root, bg="#f0f4f8", padx=20, pady=10)
+input_frame.pack(pady=10, fill="x")
 
-            # Résolution du problème
-            result, obj = solve_meeting_scheduling(meetings, timeslots, participants, availability)
+ttk.Label(input_frame, text="Participants (séparés par virgule) :").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+participants_entry = ttk.Entry(input_frame, width=50)
+participants_entry.grid(row=0, column=1, padx=10, pady=5)
 
-            result_text.delete(1.0, tk.END)  # Effacer les anciens résultats
-            if result:
-                for r, t in result.items():
-                    result_text.insert(tk.END, f"{r} → {t}\n")
-                result_text.insert(tk.END, f"\nScore objectif : {obj:.2f}")
-            else:
-                result_text.insert(tk.END, "Aucune solution trouvée.")
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors du calcul : {e}")
+ttk.Label(input_frame, text="Réunions :").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+meetings_entry = ttk.Entry(input_frame, width=50)
+meetings_entry.grid(row=1, column=1, padx=10, pady=5)
 
-    # Bouton de lancement du calcul
-    ttk.Button(root, text="Lancer le calcul", command=solve).grid(row=2, column=0, pady=10)
+ttk.Label(input_frame, text="Créneaux horaires :").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+timeslots_entry = ttk.Entry(input_frame, width=50)
+timeslots_entry.grid(row=2, column=1, padx=10, pady=5)
 
-    root.mainloop()
+ttk.Label(input_frame, text="Disponibilités (dict Python) :").grid(row=3, column=0, sticky="nw", padx=10, pady=5)
+availability_entry = scrolledtext.ScrolledText(input_frame, height=6, width=48, font=("Helvetica", 12))
+availability_entry.grid(row=3, column=1, padx=10, pady=5)
+
+# === Button Frame ===
+button_frame = tk.Frame(root, bg="#f0f4f8", padx=10, pady=10)
+button_frame.pack(pady=20)
+
+solve_btn = ttk.Button(button_frame, text="📌 Lancer la planification", command=run_solver)
+solve_btn.grid(row=0, column=0, padx=15, pady=10)
+
+# === Output Frame ===
+output_frame = ttk.LabelFrame(root, text="", padding=10)
+output_frame.pack(padx=10, pady=5, fill="both", expand=True)
+
+output_label = ttk.Label(output_frame, text="Résultat", font=("Helvetica", 14, "bold"))
+output_label.pack(pady=5)
+
+result_text = scrolledtext.ScrolledText(output_frame, wrap="word", height=10, font=("Helvetica", 12), state='disabled')
+result_text.pack(fill="both", expand=True)
+
+root.mainloop()
