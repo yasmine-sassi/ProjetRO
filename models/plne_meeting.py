@@ -1,71 +1,57 @@
 from gurobipy import Model, GRB
 
-def solve_meeting_scheduling(meetings, timeslots, participants, availability):
-    model = Model("PlanificationRéunions")
+def solve_meeting_scheduling(meetings, timeslots, rooms, room_capacities, meeting_participants, conflicts):
+    model = Model("PlanificationReunions")
     model.setParam("OutputFlag", 0)
 
-    # Variables : x[r, t] = 1 si réunion r est planifiée au créneau t
-    x = {(r, t): model.addVar(vtype=GRB.BINARY, name=f"x_{r}_{t}")
-         for r in meetings for t in timeslots}
+    # Variables de décision
+    x = model.addVars(
+        [(r, h, s) for r in meetings for h in timeslots for s in rooms],
+        vtype=GRB.BINARY,
+        name="x"
+    )
 
-    # Variables auxiliaires : z[p, t] = 1 si la personne p est assignée à une réunion à t
-    z = {(p, t): model.addVar(vtype=GRB.BINARY, name=f"z_{p}_{t}")
-         for p in participants for t in timeslots}
+    # Objectif : maximiser le nombre de réunions planifiées
+    model.setObjective(x.sum(), GRB.MAXIMIZE)
 
-    # Chaque réunion a un seul créneau
-    for r in meetings:
-        model.addConstr(sum(x[r, t] for t in timeslots) == 1, name=f"one_slot_{r}")
+    # Contraintes
+    # 1. Une réunion ne peut être planifiée qu'une seule fois
+    model.addConstrs(
+        (sum(x[r, h, s] for h in timeslots for s in rooms) <= 1 for r in meetings),
+        name="single_assign"
+    )
 
-    # Une personne ne peut être dans deux réunions à la fois
-    for p in participants:
-        for t in timeslots:
-            model.addConstr(
-                sum(x[r, t] for r in meetings if p in meetings[r]) <= 1,
-                name=f"conflict_{p}_{t}"
-            )
+    # 2. Une salle ne peut accueillir qu'une réunion à la fois
+    model.addConstrs(
+        (sum(x[r, h, s] for r in meetings) <= 1 
+        for h in timeslots for s in rooms),
+        name="room_occupancy"
+    )
 
-    # Contrainte de disponibilité : z[p,t] = 1 si p est dans une réunion à t
-    for p in participants:
-        for t in timeslots:
-            model.addConstr(
-                z[p, t] >= sum(x[r, t] for r in meetings if p in meetings[r]),
-                name=f"assign_{p}_{t}"
-            )
-            # Respecter disponibilité
-            if not availability.get(p, {}).get(t, True):
-                model.addConstr(z[p, t] == 0, name=f"dispo_{p}_{t}")
+    # 3. Gestion des conflits
+    for conflict_group in conflicts:
+        model.addConstrs(
+            (sum(x[r, h, s] for r in conflict_group for s in rooms) <= 1 
+            for h in timeslots),
+            name=f"conflict_{'_'.join(conflict_group)}"
+        )
 
-    # Objectif : minimiser les conflits potentiels (nb de z[p,t] activés)
-    model.setObjective(sum(z[p, t] for p in participants for t in timeslots), GRB.MINIMIZE)
+    # 4. Respect des capacités des salles
+    model.addConstrs(
+        (sum(x[r, h, s] * meeting_participants[r] for r in meetings) <= room_capacities[s]
+        for h in timeslots for s in rooms),
+        name="capacity"
+    )
+
+    # Résolution
     model.optimize()
 
     if model.status == GRB.OPTIMAL:
-        schedule = {r: t for (r, t) in x if x[r, t].X > 0.5}
-        return schedule, model.ObjVal
-    else:
-        return None, None
-
-
-# Exemple d’appel
-if __name__ == "__main__":
-    meetings = {
-        "Réunion1": ["Alice", "Bob"],
-        "Réunion2": ["Bob", "Charlie"],
-        "Réunion3": ["Alice", "Charlie"]
-    }
-    timeslots = ["9h", "10h", "11h"]
-    participants = ["Alice", "Bob", "Charlie"]
-    availability = {
-        "Alice": {"9h": True, "10h": True, "11h": True},
-        "Bob": {"9h": True, "10h": False, "11h": True},
-        "Charlie": {"9h": True, "10h": True, "11h": True}
-    }
-
-    schedule, score = solve_meeting_scheduling(meetings, timeslots, participants, availability)
-    if schedule:
-        print("Planning des réunions :")
-        for r in schedule:
-            print(f" - {r} → {schedule[r]}")
-        print(f"Score objectif (nb d'assignations) : {score}")
-    else:
-        print("Aucune solution trouvée.")
+        planning = []
+        for r in meetings:
+            for h in timeslots:
+                for s in rooms:
+                    if x[r, h, s].X > 0.5:
+                        planning.append((r, h, s))
+        return planning, len(planning)
+    return None ,0

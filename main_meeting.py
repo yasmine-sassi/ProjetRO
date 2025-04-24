@@ -1,4 +1,8 @@
-from gui.meeting_gui import launch_meeting_app
+import tkinter as tk
+from gui.meeting_gui import MeetingSchedulerApp
 
 if __name__ == "__main__":
-    launch_meeting_app()
+    root = tk.Tk()
+    root.title("Optimisation de Planning de Réunions")
+    app = MeetingSchedulerApp(root)
+    root.mainloop()

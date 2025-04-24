@@ -1,4 +1,7 @@
-from gui.staffing_gui import launch_pl_app
+import tkinter as tk
+from gui.staffing_gui import StaffingApp
 
 if __name__ == "__main__":
-    launch_pl_app()
+    root = tk.Tk()
+    app = StaffingApp(root)
+    root.mainloop()

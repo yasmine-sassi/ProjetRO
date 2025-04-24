@@ -1,9 +1,3 @@
-`pip install gurobi`
-
-`grbgetkey VOTRE-CLE-LICENCE`
-
-python -m tkinter
-
 # Problème 1 – Programmation Linéaire (PL) : Affectation de personnel à des projets
 
 ## Contexte
